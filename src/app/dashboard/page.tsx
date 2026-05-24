@@ -100,8 +100,8 @@ export default function DashboardPage() {
   const dadoBaja      = data?.byStatus?.["DADO_DE_BAJA"]      || 0;
   const totalConBaja  = operativos + enMant + fueraServicio + dadoBaja;
 
-  const preventivos = parseInt(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "PREVENTIVO")?.count || "0");
-  const correctivos = parseInt(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "CORRECTIVO")?.count ?? "0");
+  const preventivos = Number(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "PREVENTIVO")?.count ?? 0);
+  const correctivos = Number(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "CORRECTIVO")?.count ?? 0);
 
   const pieData = [
     { name: "Operativo",         value: operativos    },
