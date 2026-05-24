@@ -5,11 +5,11 @@ import { query } from "@/lib/db";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const userId = (session.user as any).id;
+  const userId = (session.user as { id: string }).id;
 
   // Primero verificamos si ya existe un secreto guardado para este usuario.
   // Si ya hay uno, lo reutilizamos en lugar de generar uno nuevo.
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const userId = (session.user as any).id;
+  const userId = (session.user as { id: string }).id;
   const { code } = await req.json();
 
   const rows = await query(

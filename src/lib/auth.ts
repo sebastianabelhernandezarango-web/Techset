@@ -1,10 +1,35 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, User, Session } from "next-auth";
+import { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { Pool } from "@neondatabase/serverless";
 
+interface ExtendedUser extends User {
+  role: string;
+  twoFactorEnabled: boolean;
+}
+
+interface ExtendedToken extends JWT {
+  id: string;
+  role: string;
+  twoFactorEnabled: boolean;
+  twoFactorVerified: boolean;
+}
+
+interface ExtendedSession extends Session {
+  user: {
+    id: string;
+    role: string;
+    twoFactorEnabled: boolean;
+    twoFactorVerified: boolean;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
+}
+
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt", maxAge: 30 * 60},
+  session: { strategy: "jwt", maxAge: 30 * 60 },
   pages: { signIn: "/login" },
   providers: [
     CredentialsProvider({
@@ -30,15 +55,13 @@ export const authOptions: NextAuthOptions = {
           const valid = await bcrypt.compare(credentials.password, user.passwordHash);
           if (!valid) return null;
 
-          // Cada login fresco resetea twoFactorVerified en DB
-
           return {
             id:               user.id,
             name:             user.name,
             email:            user.email,
             role:             user.role,
             twoFactorEnabled: user.twoFactorEnabled,
-          };
+          } as ExtendedUser;
         } catch (error) {
           console.error("Error en authorize:", error);
           return null;
@@ -49,24 +72,27 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
-        token.id                = user.id;
-        token.role              = (user as any).role;
-        token.twoFactorEnabled  = (user as any).twoFactorEnabled;
-        token.twoFactorVerified = false;
+        const u = user as ExtendedUser;
+        (token as ExtendedToken).id                = u.id as string;
+        (token as ExtendedToken).role              = u.role;
+        (token as ExtendedToken).twoFactorEnabled  = u.twoFactorEnabled;
+        (token as ExtendedToken).twoFactorVerified = false;
       }
-      if (trigger === "update" && session?.twoFactorVerified === true) {
-        token.twoFactorVerified = true;
+      if (trigger === "update" && (session as { twoFactorVerified?: boolean })?.twoFactorVerified === true) {
+        (token as ExtendedToken).twoFactorVerified = true;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).id                = token.id;
-        (session.user as any).role              = token.role;
-        (session.user as any).twoFactorEnabled  = token.twoFactorEnabled;
-        (session.user as any).twoFactorVerified = token.twoFactorVerified;
+      const t = token as ExtendedToken;
+      const s = session as ExtendedSession;
+      if (s.user) {
+        s.user.id                = t.id;
+        s.user.role              = t.role;
+        s.user.twoFactorEnabled  = t.twoFactorEnabled;
+        s.user.twoFactorVerified = t.twoFactorVerified;
       }
-      return session;
+      return s;
     },
   },
 };

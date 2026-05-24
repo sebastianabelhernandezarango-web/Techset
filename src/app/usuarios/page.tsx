@@ -1,3 +1,4 @@
+import React from "react";
 "use client";
 import { Sidebar } from "../components/layout/SideBar";
 import { useState, useEffect } from "react";
@@ -10,7 +11,7 @@ const ROLE_STYLES: Record<string, string> = {
   CONSULTOR: "bg-gray-500/15 text-gray-400 border border-gray-500/30",
 };
 
-const ROLE_ICONS: Record<string, any> = {
+const ROLE_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   ADMIN:     Shield,
   TECNICO:   Wrench,
   CONSULTOR: Eye,
@@ -32,7 +33,7 @@ interface UserData {
 
 export default function UsuariosPage() {
   const { data: session } = useSession();
-  const currentRole = (session?.user as any)?.role as string;
+  const currentRole = (session?.user as { role?: string })?.role ?? "";
   const isAdmin = currentRole === "ADMIN";
 
   const [users, setUsers]           = useState<UserData[]>([]);
@@ -306,7 +307,7 @@ function UserForm({
     ? ["CONSULTOR", "TECNICO", "ADMIN"]
     : ["CONSULTOR", "TECNICO"];
 
-  const roleMeta: Record<string, { label: string; desc: string; icon: any }> = {
+  const roleMeta: Record<string, { label: string; desc: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }> = {
     CONSULTOR: { label: "Consultor",     desc: "Solo lectura — puede ver activos y reportes",           icon: Eye    },
     TECNICO:   { label: "Técnico",       desc: "Puede registrar y editar activos y mantenimientos",     icon: Wrench },
     ADMIN:     { label: "Administrador", desc: "Acceso total — gestiona usuarios y configuración",      icon: Shield },

@@ -10,7 +10,7 @@ export async function PATCH(
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const role = (session.user as any).role;
+  const role = (session.user as { role: string }).role;
   if (role !== "ADMIN") return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
 
   const { id } = params;
@@ -21,7 +21,7 @@ export async function PATCH(
 
   // Build update dynamically based on what was sent
   const updates: string[] = [];
-  const values: any[]     = [];
+  const values: unknown[]     = [];
   let i = 1;
 
   if (name !== undefined)     { updates.push(`name = $${i++}`);             values.push(name); }

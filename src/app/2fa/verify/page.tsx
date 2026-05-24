@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+
+
 import { ShieldCheck, AlertCircle, Loader2 } from "lucide-react";
 
 export default function TwoFactorVerifyPage() {
-  const { update } = useSession();
-  const router     = useRouter();
+  
+  
 
   const [code, setCode]       = useState("");
   const [error, setError]     = useState("");

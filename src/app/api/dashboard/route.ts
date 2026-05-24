@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   const byStatus = Object.fromEntries(
-    byStatusRes.map((r: any) => [r.status, parseInt(r.count)])
+    byStatusRes.map((r: { status: string; count: string }) => [r.status, parseInt(r.count)])
   );
 
   return NextResponse.json({

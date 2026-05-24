@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { query } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const role = (session.user as any).role;
+  const role = (session.user as { role: string }).role;
   if (role !== "ADMIN") return NextResponse.json({ error: "Solo administradores" }, { status: 403 });
 
   const { name, email, password, userRole } = await req.json();

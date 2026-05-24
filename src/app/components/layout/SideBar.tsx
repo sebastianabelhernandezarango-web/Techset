@@ -34,7 +34,7 @@ const ROLE_COLORS: Record<string, string> = {
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const user = session?.user as any;
+  const user = session?.user as { name?: string; email?: string; role?: string } | undefined;
   const initials = user?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "U";
 
   return (

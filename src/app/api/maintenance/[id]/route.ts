@@ -10,7 +10,7 @@ export async function PATCH(
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const role = (session.user as any).role;
+  const role = (session.user as { role: string }).role;
   if (role === "CONSULTOR") return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
 
   const { id } = params;

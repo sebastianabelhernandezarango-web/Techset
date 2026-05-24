@@ -13,12 +13,12 @@ import { Sidebar } from "../components/layout/SideBar";
 
 const PIE_COLORS = ["#4A90D9", "#10B981", "#F59E0B", "#EF4444"];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-[#0F2A45] border border-[#1E3A5F] rounded-lg px-3 py-2 text-xs">
       <p className="text-[#8DA3B8] mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p: { name: string; value: number; color: string }, i: number) => (
         <p key={i} style={{ color: p.color }} className="font-medium">
           {p.name}: {p.name === "Costo" ? `$${parseInt(p.value).toLocaleString("es-CO")}` : p.value}
         </p>
@@ -48,7 +48,7 @@ function generarPeriodos() {
 export default function DashboardPage() {
   const periodos  = generarPeriodos();
   const [periodoIdx, setPeriodoIdx] = useState(0); // 0 = más reciente
-  const [data, setData]     = useState<any>(null);
+  const [data, setData]     = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(true);
 
   const periodo = periodos[periodoIdx];
@@ -88,8 +88,8 @@ export default function DashboardPage() {
   const dadoBaja      = data?.byStatus?.["DADO_DE_BAJA"]      || 0;
   const totalConBaja  = operativos + enMant + fueraServicio + dadoBaja;
 
-  const preventivos = data?.maintByType?.find((t: any) => t.type === "PREVENTIVO")?.count || 0;
-  const correctivos = data?.maintByType?.find((t: any) => t.type === "CORRECTIVO")?.count || 0;
+  const preventivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "PREVENTIVO")?.count || 0;
+  const correctivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "CORRECTIVO")?.count || 0;
 
   const pieData = [
     { name: "Operativo",         value: operativos    },
@@ -98,11 +98,11 @@ export default function DashboardPage() {
     { name: "Dado de baja",      value: dadoBaja      },
   ].filter(d => d.value > 0);
 
-  const barData = data?.activosPorMes?.map((m: any) => ({
+  const barData = data?.activosPorMes?.map((m: { month: string; count: number }) => ({
     mes: m.mes, Activos: parseInt(m.count),
   })) || [];
 
-  const lineData = data?.maintPorMes?.map((m: any) => ({
+  const lineData = data?.maintPorMes?.map((m: { month: string; count: number }) => ({
     mes: m.mes,
     Mantenimientos: parseInt(m.count),
     Costo: parseInt(m.costo),
@@ -262,7 +262,7 @@ export default function DashboardPage() {
                     <PieChart>
                       <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={65}
                         paddingAngle={3} dataKey="value">
-                        {pieData.map((_: any, i: number) => (
+                        {pieData.map((_: unknown, i: number) => (
                           <Cell key={i} fill={PIE_COLORS[i]} />
                         ))}
                       </Pie>
@@ -270,7 +270,7 @@ export default function DashboardPage() {
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="space-y-2 mt-1">
-                    {pieData.map((d: any, i: number) => (
+                    {pieData.map((d: { name: string; value: number }, i: number) => (
                       <div key={d.name} className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full" style={{ background: PIE_COLORS[i] }} />
@@ -315,7 +315,7 @@ export default function DashboardPage() {
               <h3 className="text-white text-sm font-semibold mb-0.5">Por categoría</h3>
               <p className="text-[#3D6A80] text-xs mb-5">Distribución de inventario</p>
               <div className="space-y-3">
-                {data?.byCategory?.map((cat: any) => (
+                {data?.byCategory?.map((cat: { category: string; count: number }) => (
                   <div key={cat.name}>
                     <div className="flex justify-between text-xs mb-1.5">
                       <span className="text-[#3D6A80]">{cat.name}</span>
@@ -337,7 +337,7 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {data?.topAssets?.length === 0 ? (
                   <p className="text-[#2D4A63] text-xs text-center py-4">Sin datos aún</p>
-                ) : data?.topAssets?.map((a: any, i: number) => (
+                ) : data?.topAssets?.map((a: { name: string; serial: string; category: string }, i: number) => (
                   <div key={a.serial} className="flex items-center gap-3">
                     <span className="text-[#2D4A63] text-xs w-4">{i + 1}</span>
                     <div className="flex-1 min-w-0">
@@ -360,7 +360,7 @@ export default function DashboardPage() {
                     <CheckCircle className="w-8 h-8 text-emerald-400/40 mx-auto mb-2" />
                     <p className="text-[#2D4A63] text-xs">Sin alertas pendientes</p>
                   </div>
-                ) : data?.alerts?.map((a: any) => (
+                ) : data?.alerts?.map((a: { id: string; name: string; serial: string; nextMaintDate: string }) => (
                   <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl"
                     style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />

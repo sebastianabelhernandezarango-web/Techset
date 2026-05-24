@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
     WHERE 1=1
   `;
 
-  const params: any[] = [];
+  const params: unknown[] = [];
   let i = 1;
 
   if (status) { sql += ` AND a.status = $${i++}`; params.push(status); }
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const role = (session.user as any).role;
+  const role = (session.user as { role: string }).role;
   if (role === "CONSULTOR") return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
 
   const body = await req.json();
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  const role = (session.user as any).role;
+  const role = (session.user as { role: string }).role;
   if (role === "CONSULTOR") return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
 
   const { searchParams } = new URL(req.url);

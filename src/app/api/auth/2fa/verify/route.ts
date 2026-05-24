@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const userId = (session.user as any).id;
+  const userId = (session.user as { id: string }).id;
   const { code } = await req.json();
 
   if (!code || code.length !== 6) {

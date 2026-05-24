@@ -3,8 +3,8 @@ import { Sidebar } from "../components/layout/SideBar";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import {
-  Plus, Wrench, AlertCircle, CheckCircle2, Clock,
-  Search, Filter, DollarSign, CalendarClock, CheckCheck,
+  Wrench, CheckCircle2, Clock,
+  Search, DollarSign, CalendarClock, CheckCheck,
 } from "lucide-react";
 
 const TYPE_STYLES: Record<string, string> = {
@@ -39,12 +39,11 @@ interface Maintenance {
 
 export default function MantenimientosPage() {
   const { data: session } = useSession();
-  const currentRole = (session?.user as any)?.role as string;
+  const currentRole = (session?.user as { role?: string })?.role ?? "";
   const canEdit = currentRole === "ADMIN" || currentRole === "TECNICO";
 
   const [records, setRecords]     = useState<Maintenance[]>([]);
   const [loading, setLoading]     = useState(true);
-  const [showForm, setShowForm]   = useState(false);
   const [search, setSearch]       = useState("");
   const [filterType, setFilterType]     = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -274,9 +273,10 @@ export default function MantenimientosPage() {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MaintenanceForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [assets, setAssets]   = useState<any[]>([]);
-  const [users, setUsers]     = useState<any[]>([]);
+  const [assets, setAssets]   = useState<Record<string, unknown>[]>([]);
+  const [users, setUsers]     = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [form, setForm] = useState({
@@ -291,7 +291,7 @@ function MaintenanceForm({ onClose, onSaved }: { onClose: () => void; onSaved: (
     ]).then(([a, u]) => {
       setAssets(Array.isArray(a) ? a : []);
       // Only show technicians and admins as assignable techs
-      setUsers(Array.isArray(u) ? u.filter((x: any) => x.role !== "CONSULTOR") : []);
+      setUsers(Array.isArray(u) ? u.filter((x: { role?: string }) => x.role !== "CONSULTOR") : []);
     });
   }, []);
 

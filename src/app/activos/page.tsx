@@ -1,3 +1,4 @@
+import React from "react";
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -22,7 +23,7 @@ const MAINT_STYLES: Record<string, string> = {
   CORRECTIVO: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
-const CATEGORY_ICONS: Record<string, any> = {
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   monitor: Monitor, smartphone: Smartphone, network: Network, printer: Printer, box: Box,
 };
 
@@ -51,7 +52,7 @@ interface AssetDetail extends Asset {
 function Dropdown({ value, onChange, options, placeholder, icon: Icon }: {
   value: string; onChange: (v: string) => void;
   options: { value: string; label: string }[];
-  placeholder: string; icon: any;
+  placeholder: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -333,7 +334,7 @@ function DetailPanel({ asset, loading, onClose, onRefresh }: {
   onClose: () => void; onRefresh: () => void;
 }) {
   const { data: session } = useSession();
-  const role = (session?.user as any)?.role as string;
+  const role = (session?.user as { role?: string })?.role ?? "";
   const canEdit = role === "ADMIN" || role === "TECNICO";
 
   const [showMaintForm, setShowMaintForm] = useState(false);
@@ -463,7 +464,7 @@ function DetailPanel({ asset, loading, onClose, onRefresh }: {
                     ) : (
                       <div className="px-4 py-3 rounded-xl" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
                         <p className="text-red-400 text-xs font-semibold mb-1">¿Confirmar baja?</p>
-                        <p className="text-[#3D6A80] text-[10px] mb-3">Esta acción es irreversible. El activo quedará como "Dado de baja".</p>
+                        <p className="text-[#3D6A80] text-[10px] mb-3">Esta acción es irreversible. El activo quedará como &quot;Dado de baja&quot;.</p>
                         <div className="flex gap-2">
                           <button onClick={() => setConfirmBaja(false)}
                             className="flex-1 py-1.5 rounded-lg text-xs text-[#3D6A80] hover:text-white transition-colors"
@@ -636,8 +637,8 @@ function MaintenanceForm({ assetId, assetName, onClose, onSaved }: {
   onClose: () => void; onSaved: () => void;
 }) {
   const { data: session } = useSession();
-  const role    = (session?.user as any)?.role as string;
-  const userId  = (session?.user as any)?.id as string;
+  const role    = (session?.user as { role?: string })?.role ?? "";
+  const userId  = (session?.user as { id?: string })?.id ?? "";
   const isAdmin = role === "ADMIN";
 
   const [technicians, setTechnicians] = useState<any[]>([]);
@@ -658,7 +659,7 @@ function MaintenanceForm({ assetId, assetName, onClose, onSaved }: {
       fetch("/api/users")
         .then(r => r.json())
         .then(users => setTechnicians(
-          Array.isArray(users) ? users.filter((u: any) => u.role === "TECNICO") : []
+          Array.isArray(users) ? users.filter((u: { role?: string }) => u.role === "TECNICO") : []
         ));
     }
   }, [isAdmin]);
@@ -720,7 +721,7 @@ function MaintenanceForm({ assetId, assetName, onClose, onSaved }: {
               <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                 <User className="text-[#3D6A80]" style={{ width: 13, height: 13 }} />
-                <span className="text-white text-sm">{(session?.user as any)?.name}</span>
+                <span className="text-white text-sm">{(session?.user as { name?: string })?.name}</span>
                 <span className="text-[#3D6A80] text-xs ml-auto">Tú</span>
               </div>
             )}
@@ -826,8 +827,8 @@ function AssetForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
 
   const inputClass = "w-full text-white rounded-xl px-3 py-2.5 text-xs outline-none transition-all placeholder:text-[#2D4A63]";
   const inputStyle = { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" };
-  const focusIn  = (e: any) => (e.target.style.borderColor = "rgba(74,144,217,0.5)");
-  const focusOut = (e: any) => (e.target.style.borderColor = "rgba(255,255,255,0.08)");
+  const focusIn  = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => (e.target.style.borderColor = "rgba(74,144,217,0.5)");
+  const focusOut = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => (e.target.style.borderColor = "rgba(255,255,255,0.08)");
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 p-4"
@@ -854,7 +855,7 @@ function AssetForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
             ].map(f => (
               <div key={f.name}>
                 <label className="block text-[10px] text-[#3D6A80] mb-1.5 uppercase tracking-wider font-semibold">{f.label} *</label>
-                <input name={f.name} value={(form as any)[f.name]} onChange={handleChange} required={f.required}
+                <input name={f.name} value={(form as Record<string, string>)[f.name]} onChange={handleChange} required={f.required}
                   className={inputClass} style={inputStyle} onFocus={focusIn} onBlur={focusOut} />
               </div>
             ))}
