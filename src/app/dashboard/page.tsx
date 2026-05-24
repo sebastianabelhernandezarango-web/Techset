@@ -48,7 +48,19 @@ function generarPeriodos() {
 export default function DashboardPage() {
   const periodos  = generarPeriodos();
   const [periodoIdx, setPeriodoIdx] = useState(0); // 0 = más reciente
-  const [data, setData]     = useState<Record<string, unknown>>({});
+  const [data, setData]     = useState<{
+    total?: number;
+    byStatus?: Record<string, number>;
+    byCategory?: { name: string; icon: string; count: number }[];
+    maintByType?: { type: string; count: number }[];
+    topAssets?: { name: string; serial: string; total_mant: number }[];
+    alerts?: { id: string; asset_name: string; asset_serial: string; nextDate: string }[];
+    activosPorMes?: { mes: string; count: string }[];
+    maintPorMes?: { mes: string; count: string; costo: string }[];
+    costos?: { total_period: string; total_month: string };
+    maintThisMonth?: number;
+    periodo?: { desde: string; hasta: string };
+  }>({});
   const [loading, setLoading] = useState(true);
 
   const periodo = periodos[periodoIdx];
@@ -88,8 +100,8 @@ export default function DashboardPage() {
   const dadoBaja      = data?.byStatus?.["DADO_DE_BAJA"]      || 0;
   const totalConBaja  = operativos + enMant + fueraServicio + dadoBaja;
 
-  const preventivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "PREVENTIVO")?.count || 0;
-  const correctivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "CORRECTIVO")?.count || 0;
+  const preventivos = parseInt(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "PREVENTIVO")?.count || "0");
+  const correctivos = parseInt(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "CORRECTIVO")?.count ?? "0");
 
   const pieData = [
     { name: "Operativo",         value: operativos    },
@@ -98,11 +110,11 @@ export default function DashboardPage() {
     { name: "Dado de baja",      value: dadoBaja      },
   ].filter(d => d.value > 0);
 
-  const barData = data?.activosPorMes?.map((m: { month: string; count: number }) => ({
+  const barData = data?.activosPorMes?.map((m: { mes: string; count: string }) => ({
     mes: m.mes, Activos: parseInt(m.count),
   })) || [];
 
-  const lineData = data?.maintPorMes?.map((m: { month: string; count: number }) => ({
+  const lineData = data?.maintPorMes?.map((m: { mes: string; count: string; costo: string }) => ({
     mes: m.mes,
     Mantenimientos: parseInt(m.count),
     Costo: parseInt(m.costo),
@@ -198,7 +210,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <p className="text-3xl font-bold text-white mb-1">
-                ${parseFloat(data?.costos?.total_period || 0).toLocaleString("es-CO")}
+                ${parseFloat(data?.costos?.total_period ?? "0").toLocaleString("es-CO")}
               </p>
               <p className="text-xs text-[#2D4A63]">en mantenimientos del período</p>
             </div>
@@ -315,7 +327,7 @@ export default function DashboardPage() {
               <h3 className="text-white text-sm font-semibold mb-0.5">Por categoría</h3>
               <p className="text-[#3D6A80] text-xs mb-5">Distribución de inventario</p>
               <div className="space-y-3">
-                {data?.byCategory?.map((cat: { category: string; count: number }) => (
+                {data?.byCategory?.map((cat: { name: string; icon: string; count: number }) => (
                   <div key={cat.name}>
                     <div className="flex justify-between text-xs mb-1.5">
                       <span className="text-[#3D6A80]">{cat.name}</span>
@@ -337,7 +349,7 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {data?.topAssets?.length === 0 ? (
                   <p className="text-[#2D4A63] text-xs text-center py-4">Sin datos aún</p>
-                ) : data?.topAssets?.map((a: { name: string; serial: string; category: string }, i: number) => (
+                ) : data?.topAssets?.map((a: { name: string; serial: string; total_mant: number }, i: number) => (
                   <div key={a.serial} className="flex items-center gap-3">
                     <span className="text-[#2D4A63] text-xs w-4">{i + 1}</span>
                     <div className="flex-1 min-w-0">
@@ -360,7 +372,7 @@ export default function DashboardPage() {
                     <CheckCircle className="w-8 h-8 text-emerald-400/40 mx-auto mb-2" />
                     <p className="text-[#2D4A63] text-xs">Sin alertas pendientes</p>
                   </div>
-                ) : data?.alerts?.map((a: { id: string; name: string; serial: string; nextMaintDate: string }) => (
+                ) : data?.alerts?.map((a: { id: string; asset_name: string; asset_serial: string; nextDate: string }) => (
                   <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl"
                     style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
                     <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
