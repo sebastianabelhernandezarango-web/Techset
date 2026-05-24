@@ -1,421 +1,398 @@
 "use client";
-import { Sidebar } from "../components/layout/SideBar";
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useState, useEffect, useCallback } from "react";
 import {
-  Wrench, CheckCircle2, Clock,
-  Search, DollarSign, CalendarClock, CheckCheck,
+  Monitor, Wrench, AlertCircle, CheckCircle,
+  TrendingUp, DollarSign, Activity, Clock,
+  ChevronLeft, ChevronRight, Calendar,
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, CartesianGrid, LineChart, Line, Legend,
+} from "recharts";
+import { Sidebar } from "../components/layout/SideBar";
 
-const TYPE_STYLES: Record<string, string> = {
-  PREVENTIVO: "bg-blue-500/15 text-blue-400 border border-blue-500/30",
-  CORRECTIVO: "bg-orange-500/15 text-orange-400 border border-orange-500/30",
+const PIE_COLORS = ["#4A90D9", "#10B981", "#F59E0B", "#EF4444"];
+
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#0F2A45] border border-[#1E3A5F] rounded-lg px-3 py-2 text-xs">
+      <p className="text-[#8DA3B8] mb-1">{label}</p>
+      {payload.map((p: { name: string; value: number; color: string }, i: number) => (
+        <p key={i} style={{ color: p.color }} className="font-medium">
+          {p.name}: {p.name === "Costo" ? `$${Math.round(p.value).toLocaleString("es-CO")}` : p.value}
+        </p>
+      ))}
+    </div>
+  );
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  PENDIENTE:  "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30",
-  EN_PROCESO: "bg-blue-500/15 text-blue-400 border border-blue-500/30",
-  COMPLETADO: "bg-green-500/15 text-green-400 border border-green-500/30",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDIENTE:  "Pendiente",
-  EN_PROCESO: "En proceso",
-  COMPLETADO: "Completado",
-};
-
-interface Maintenance {
-  id: string;
-  asset_name: string;
-  asset_serial: string;
-  tech_name: string;
-  type: string;
-  status: string;
-  description: string;
-  cost?: number;
-  date: string;
-  nextDate?: string;
+// Genera períodos fiscales anuales: 1 ene → 31 dic de cada año
+function generarPeriodos() {
+  const anioActual = new Date().getFullYear();
+  const periodos   = [];
+  // Generamos desde el año actual hasta 4 años atrás
+  for (let i = 0; i < 5; i++) {
+    const anio = anioActual - i;
+    const desde = new Date(anio, 0, 1);           // 1 enero
+    const hasta = new Date(anio, 11, 31, 23, 59, 59); // 31 diciembre
+    periodos.push({
+      label: `Año ${anio}`,
+      desde: desde.toISOString(),
+      hasta: hasta.toISOString(),
+    });
+  }
+  return periodos;
 }
 
-export default function MantenimientosPage() {
-  const { data: session } = useSession();
-  const currentRole = (session?.user as { role?: string })?.role ?? "";
-  const canEdit = currentRole === "ADMIN" || currentRole === "TECNICO";
+export default function DashboardPage() {
+  const periodos  = generarPeriodos();
+  const [periodoIdx, setPeriodoIdx] = useState(0); // 0 = más reciente
+  const [data, setData]     = useState<{
+    total?: number;
+    byStatus?: Record<string, number>;
+    byCategory?: { name: string; icon: string; count: number }[];
+    maintByType?: { type: string; count: number }[];
+    topAssets?: { name: string; serial: string; total_mant: number }[];
+    alerts?: { id: string; asset_name: string; asset_serial: string; nextDate: string }[];
+    activosPorMes?: { mes: string; count: string | number }[];
+    maintPorMes?: { mes: string; count: string | number; costo: string | number }[];
+    costos?: { total_period: string; total_month: string };
+    maintThisMonth?: number;
+    periodo?: { desde: string; hasta: string };
+  }>({});
+  const [loading, setLoading] = useState(true);
 
-  const [records, setRecords]     = useState<Maintenance[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState("");
-  const [filterType, setFilterType]     = useState("ALL");
-  const [filterStatus, setFilterStatus] = useState("ALL");
+  const periodo = periodos[periodoIdx];
 
-  async function fetchRecords() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
-    const res  = await fetch("/api/maintenance");
-    const data = await res.json();
-    setRecords(Array.isArray(data) ? data : []);
-    setLoading(false);
-  }
-
-  useEffect(() => { fetchRecords(); }, []);
-
-  async function updateStatus(id: string, status: string) {
-    await fetch(`/api/maintenance/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+    const params = new URLSearchParams({
+      desde: periodo.desde,
+      hasta: periodo.hasta,
     });
-    fetchRecords();
-  }
+    const res  = await fetch(`/api/dashboard?${params}`);
+    const json = await res.json();
+    setData(json);
+    setLoading(false);
+  }, [periodo.desde, periodo.hasta]);
 
-  const filtered = records.filter(r => {
-    const matchSearch = r.asset_name.toLowerCase().includes(search.toLowerCase()) ||
-                        r.asset_serial.toLowerCase().includes(search.toLowerCase()) ||
-                        r.tech_name.toLowerCase().includes(search.toLowerCase());
-    const matchType   = filterType   === "ALL" || r.type   === filterType;
-    const matchStatus = filterStatus === "ALL" || r.status === filterStatus;
-    return matchSearch && matchType && matchStatus;
-  });
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const totalCost = records.reduce((sum, r) => sum + (r.cost || 0), 0);
-  const counts = {
-    total:      records.length,
-    pendiente:  records.filter(r => r.status === "PENDIENTE").length,
-    en_proceso: records.filter(r => r.status === "EN_PROCESO").length,
-    completado: records.filter(r => r.status === "COMPLETADO").length,
-  };
+  const canPrev = periodoIdx < periodos.length - 1;
+  const canNext = periodoIdx > 0;
+
+  if (loading && !data) return (
+    <div className="flex">
+      <Sidebar />
+      <div className="ml-60 flex-1 p-8 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Activity className="w-8 h-8 text-[#4A90D9] animate-pulse mx-auto mb-3" />
+          <p className="text-[#8DA3B8] text-sm">Cargando dashboard...</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const operativos    = data?.byStatus?.["OPERATIVO"]         || 0;
+  const enMant        = data?.byStatus?.["EN_MANTENIMIENTO"]  || 0;
+  const fueraServicio = data?.byStatus?.["FUERA_DE_SERVICIO"] || 0;
+  const dadoBaja      = data?.byStatus?.["DADO_DE_BAJA"]      || 0;
+  const totalConBaja  = operativos + enMant + fueraServicio + dadoBaja;
+
+  const preventivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "PREVENTIVO")?.count ?? 0;
+  const correctivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "CORRECTIVO")?.count ?? 0;
+
+  const pieData = [
+    { name: "Operativo",         value: operativos    },
+    { name: "En mantenimiento",  value: enMant        },
+    { name: "Fuera de servicio", value: fueraServicio },
+    { name: "Dado de baja",      value: dadoBaja      },
+  ].filter(d => d.value > 0);
+
+  const barData = data?.activosPorMes?.map((m: { mes: string; count: string | number }) => ({
+    mes: m.mes, Activos: Number(m.count),
+  })) || [];
+
+  const lineData = data?.maintPorMes?.map((m: { mes: string; count: string | number; costo: string | number }) => ({
+    mes: m.mes,
+    Mantenimientos: Number(m.count),
+    Costo: Number(m.costo),
+  })) || [];
 
   return (
     <div className="flex">
       <Sidebar />
-      <div className="ml-60 p-8 flex-1 min-h-screen bg-[#0A1628]">
+      <div className="ml-60 flex-1 min-h-screen bg-[#080E18]"
+        style={{ backgroundImage: "radial-gradient(ellipse at 20% 0%, rgba(74,144,217,0.04) 0%, transparent 60%)" }}>
+        <div className={`p-8 transition-opacity duration-200 ${loading ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Mantenimientos</h1>
-            <p className="text-[#8DA3B8] text-sm mt-0.5">{counts.total} registros en total</p>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#162436] border border-[#243447] rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-yellow-500/10">
-              <Clock className="w-5 h-5 text-yellow-400" />
-            </div>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
             <div>
-              <p className="text-xl font-bold text-yellow-400">{counts.pendiente}</p>
-              <p className="text-xs text-[#8DA3B8]">Pendientes</p>
-            </div>
-          </div>
-          <div className="bg-[#162436] border border-[#243447] rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/10">
-              <Wrench className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-blue-400">{counts.en_proceso}</p>
-              <p className="text-xs text-[#8DA3B8]">En proceso</p>
-            </div>
-          </div>
-          <div className="bg-[#162436] border border-[#243447] rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCheck className="w-5 h-5 text-green-400" />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-green-400">{counts.completado}</p>
-              <p className="text-xs text-[#8DA3B8]">Completados</p>
-            </div>
-          </div>
-          <div className="bg-[#162436] border border-[#243447] rounded-xl p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10">
-              <DollarSign className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <p className="text-xl font-bold text-emerald-400">
-                ${totalCost.toLocaleString("es-CO")}
+              <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+              <p className="text-[#3D6A80] text-sm mt-0.5">
+                Análisis general · {new Date().toLocaleDateString("es-CO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
               </p>
-              <p className="text-xs text-[#8DA3B8]">Costo total</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Selector de período */}
+              <div className="flex items-center gap-2 rounded-xl px-1 py-1"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <button
+                  onClick={() => canPrev && setPeriodoIdx(i => i + 1)}
+                  disabled={!canPrev}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-30"
+                  style={{ color: canPrev ? "#4A90D9" : "#2D4A63" }}
+                  onMouseEnter={e => canPrev && (e.currentTarget.style.background = "rgba(74,144,217,0.1)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <ChevronLeft style={{ width: 15, height: 15 }} />
+                </button>
+
+                <div className="flex items-center gap-2 px-2">
+                  <Calendar className="text-[#4A90D9]" style={{ width: 13, height: 13 }} />
+                  <span className="text-white text-xs font-medium whitespace-nowrap">{periodo.label}</span>
+                </div>
+
+                <button
+                  onClick={() => canNext && setPeriodoIdx(i => i - 1)}
+                  disabled={!canNext}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all disabled:opacity-30"
+                  style={{ color: canNext ? "#4A90D9" : "#2D4A63" }}
+                  onMouseEnter={e => canNext && (e.currentTarget.style.background = "rgba(74,144,217,0.1)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                >
+                  <ChevronRight style={{ width: 15, height: 15 }} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 rounded-full px-3 py-1.5"
+                style={{ background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-400 text-xs font-medium">Sistema operativo</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Filters */}
-        <div className="flex gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5568]" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar activo, serial o técnico..."
-              className="w-full bg-[#162436] border border-[#243447] text-white rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-[#4A90D9] placeholder:text-[#4A5568]"
-            />
+          {/* KPIs fila 1 */}
+          <div className="grid grid-cols-4 gap-4 mb-5">
+            {[
+              { label: "Total activos activos", value: data?.total || 0,         sub: `${dadoBaja} dados de baja`,                                               icon: Monitor,       color: "text-[#4A90D9]",  bg: "bg-[#4A90D9]/10",  border: "border-[#4A90D9]/20" },
+              { label: "Operativos",            value: operativos,                sub: totalConBaja > 0 ? `${Math.round((operativos/totalConBaja)*100)}% del total` : "0%", icon: CheckCircle,   color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+              { label: "En mantenimiento",      value: enMant,                    sub: `${fueraServicio} fuera de servicio`,                                       icon: Wrench,        color: "text-amber-400",  bg: "bg-amber-500/10",  border: "border-amber-500/20" },
+              { label: "Mantenimientos período",value: data?.maintThisMonth || 0, sub: `${preventivos} prev · ${correctivos} corr`,                               icon: Activity,      color: "text-violet-400", bg: "bg-violet-500/10", border: "border-violet-500/20" },
+            ].map(kpi => {
+              const Icon = kpi.icon;
+              return (
+                <div key={kpi.label} className={`rounded-xl p-5 border ${kpi.border}`}
+                  style={{ background: "rgba(255,255,255,0.03)" }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[#3D6A80] text-xs font-medium leading-tight">{kpi.label}</p>
+                    <div className={`p-2 rounded-lg ${kpi.bg}`}>
+                      <Icon className={`w-4 h-4 ${kpi.color}`} />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold text-white mb-1">{kpi.value}</p>
+                  <p className="text-xs text-[#2D4A63]">{kpi.sub}</p>
+                </div>
+              );
+            })}
           </div>
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            className="bg-[#162436] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]"
-          >
-            <option value="ALL">Todos los tipos</option>
-            <option value="PREVENTIVO">Preventivo</option>
-            <option value="CORRECTIVO">Correctivo</option>
-          </select>
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="bg-[#162436] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]"
-          >
-            <option value="ALL">Todos los estados</option>
-            <option value="PENDIENTE">Pendiente</option>
-            <option value="EN_PROCESO">En proceso</option>
-            <option value="COMPLETADO">Completado</option>
-          </select>
-        </div>
 
-        {/* Table */}
-        {loading ? (
-          <div className="text-center text-[#8DA3B8] py-20">Cargando...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center text-[#8DA3B8] py-20">
-            <Wrench className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>No hay mantenimientos que coincidan con los filtros</p>
+          {/* KPIs fila 2 */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="rounded-xl p-5 border border-emerald-500/20" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[#3D6A80] text-xs font-medium">Costo total del período</p>
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-white mb-1">
+                ${parseFloat(data?.costos?.total_period ?? "0").toLocaleString("es-CO")}
+              </p>
+              <p className="text-xs text-[#2D4A63]">en mantenimientos del período</p>
+            </div>
+
+            <div className="rounded-xl p-5 border border-amber-500/20" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[#3D6A80] text-xs font-medium">Alertas próximos 7 días</p>
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <AlertCircle className="w-4 h-4 text-amber-400" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-white mb-1">{data?.alerts?.length || 0}</p>
+              <p className="text-xs text-[#2D4A63]">mantenimientos por vencer</p>
+            </div>
+
+            <div className="rounded-xl p-5 border border-[#4A90D9]/20" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[#3D6A80] text-xs font-medium">Tasa de disponibilidad</p>
+                <div className="p-2 rounded-lg bg-[#4A90D9]/10">
+                  <TrendingUp className="w-4 h-4 text-[#4A90D9]" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold text-white mb-1">
+                {totalConBaja > 0 ? Math.round((operativos / totalConBaja) * 100) : 0}%
+              </p>
+              <p className="text-xs text-[#2D4A63]">{operativos} de {totalConBaja} activos operativos</p>
+            </div>
           </div>
-        ) : (
-          <div className="bg-[#162436] border border-[#243447] rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#243447] bg-[#0F1E2E]/40">
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Activo</th>
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Tipo</th>
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Descripción</th>
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Técnico</th>
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Fecha</th>
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Costo</th>
-                  <th className="text-left text-xs text-[#8DA3B8] font-medium px-5 py-3">Estado</th>
-                  {canEdit && (
-                    <th className="text-right text-xs text-[#8DA3B8] font-medium px-5 py-3">Acción</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((record) => (
-                  <tr
-                    key={record.id}
-                    className="border-b border-[#243447] last:border-0 hover:bg-[#1A2D40] transition-colors"
-                  >
-                    <td className="px-5 py-3">
-                      <p className="text-white text-sm font-medium">{record.asset_name}</p>
-                      <p className="text-[#4A5568] text-xs font-mono">#{record.asset_serial}</p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-full ${TYPE_STYLES[record.type]}`}>
-                        {record.type === "PREVENTIVO" ? "Preventivo" : "Correctivo"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 max-w-xs">
-                      <p className="text-[#8DA3B8] text-sm truncate" title={record.description}>
-                        {record.description}
-                      </p>
-                      {record.nextDate && (
-                        <p className="text-yellow-500/70 text-xs flex items-center gap-1 mt-0.5">
-                          <CalendarClock className="w-3 h-3" />
-                          Próximo: {new Date(record.nextDate).toLocaleDateString("es-CO")}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-[#8DA3B8] text-sm">{record.tech_name}</td>
-                    <td className="px-5 py-3 text-[#8DA3B8] text-sm whitespace-nowrap">
-                      {new Date(record.date).toLocaleDateString("es-CO")}
-                    </td>
-                    <td className="px-5 py-3 text-sm">
-                      {record.cost
-                        ? <span className="text-emerald-400">${record.cost.toLocaleString("es-CO")}</span>
-                        : <span className="text-[#4A5568]">—</span>
-                      }
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-full ${STATUS_STYLES[record.status ?? "PENDIENTE"]}`}>
-                        {STATUS_LABELS[record.status ?? "PENDIENTE"]}
-                      </span>
-                    </td>
-                    {canEdit && (
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {record.status !== "EN_PROCESO" && record.status !== "COMPLETADO" && (
-                            <button
-                              onClick={() => updateStatus(record.id, "EN_PROCESO")}
-                              className="text-xs px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/30 transition-colors whitespace-nowrap"
-                              title="Marcar en proceso"
-                            >
-                              En proceso
-                            </button>
-                          )}
-                          {record.status !== "COMPLETADO" && (
-                            <button
-                              onClick={() => updateStatus(record.id, "COMPLETADO")}
-                              className="text-xs px-2 py-1 rounded bg-green-500/15 text-green-400 hover:bg-green-500/30 transition-colors whitespace-nowrap"
-                              title="Marcar como completado"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+
+          {/* Gráficas fila 1 */}
+          <div className="grid gap-5 mb-5" style={{ gridTemplateColumns: "minmax(0, 1fr) 400px" }}>
+
+            {/* Activos registrados por mes */}
+            <div className="rounded-xl p-5 border border-[#1E3A5F]" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <h3 className="text-white text-sm font-semibold mb-0.5">Activos registrados por mes</h3>
+              <p className="text-[#3D6A80] text-xs mb-5">{periodo.label}</p>
+              {barData.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-[#2D4A63] text-xs">Sin datos en este período</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={barData} barSize={24}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                    <XAxis dataKey="mes" tick={{ fill: "#3D6A80", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "#3D6A80", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(74,144,217,0.05)" }} />
+                    <Bar dataKey="Activos" fill="#4A90D9" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Pie chart estado */}
+            <div className="rounded-xl p-5 border border-[#1E3A5F]"style={{ background: "rgba(255,255,255,0.03)" }}>
+              <h3 className="text-white text-sm font-semibold mb-0.5">Estado de activos</h3>
+              <p className="text-[#3D6A80] text-xs mb-3">Distribución en el período</p>
+              {pieData.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-[#2D4A63] text-xs">Sin datos</div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={65}
+                        paddingAngle={3} dataKey="value">
+                        {pieData.map((_: unknown, i: number) => (
+                          <Cell key={i} fill={PIE_COLORS[i]} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-2 mt-1">
+                    {pieData.map((d: { name: string; value: number }, i: number) => (
+                      <div key={d.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ background: PIE_COLORS[i] }} />
+                          <span className="text-[#3D6A80] text-xs">{d.name}</span>
                         </div>
-                      </td>
-                    )}
-                  </tr>
+                        <span className="text-white text-xs font-medium">{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Gráfica de mantenimientos por mes */}
+          <div className="rounded-xl p-5 border border-[#1E3A5F] mb-5" style={{ background: "rgba(255,255,255,0.03)" }}>
+            <h3 className="text-white text-sm font-semibold mb-0.5">Mantenimientos por mes</h3>
+            <p className="text-[#3D6A80] text-xs mb-5">{periodo.label}</p>
+            {lineData.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-[#2D4A63] text-xs">Sin mantenimientos en este período</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={lineData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fill: "#3D6A80", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis yAxisId="left"  tick={{ fill: "#3D6A80", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fill: "#3D6A80", fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "#3D6A80" }} />
+                  <Line yAxisId="left"  type="monotone" dataKey="Mantenimientos" stroke="#4A90D9" strokeWidth={2} dot={{ fill: "#4A90D9", r: 3 }} />
+                  <Line yAxisId="right" type="monotone" dataKey="Costo"          stroke="#10B981" strokeWidth={2} dot={{ fill: "#10B981", r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* Fila tablas */}
+          <div className="grid grid-cols-3 gap-5">
+
+            {/* Por categoría */}
+            <div className="rounded-xl p-5 border border-[#1E3A5F]" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <h3 className="text-white text-sm font-semibold mb-0.5">Por categoría</h3>
+              <p className="text-[#3D6A80] text-xs mb-5">Distribución de inventario</p>
+              <div className="space-y-3">
+                {data?.byCategory?.map((cat: { name: string; icon: string; count: number }) => (
+                  <div key={cat.name}>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-[#3D6A80]">{cat.name}</span>
+                      <span className="text-white font-medium">{cat.count}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                      <div className="h-full bg-[#4A90D9] rounded-full transition-all"
+                        style={{ width: totalConBaja > 0 ? `${(cat.count / totalConBaja) * 100}%` : "0%" }} />
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
+
+            {/* Top activos */}
+            <div className="rounded-xl p-5 border border-[#1E3A5F]" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <h3 className="text-white text-sm font-semibold mb-0.5">Activos más intervenidos</h3>
+              <p className="text-[#3D6A80] text-xs mb-5">Por número de mantenimientos</p>
+              <div className="space-y-3">
+                {data?.topAssets?.length === 0 ? (
+                  <p className="text-[#2D4A63] text-xs text-center py-4">Sin datos aún</p>
+                ) : data?.topAssets?.map((a: { name: string; serial: string; total_mant: number }, i: number) => (
+                  <div key={a.serial} className="flex items-center gap-3">
+                    <span className="text-[#2D4A63] text-xs w-4">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium truncate">{a.name}</p>
+                      <p className="text-[#2D4A63] text-xs font-mono">{a.serial}</p>
+                    </div>
+                    <span className="text-[#4A90D9] text-xs font-bold">{a.total_mant}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Próximos mantenimientos */}
+            <div className="rounded-xl p-5 border border-[#1E3A5F]" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <h3 className="text-white text-sm font-semibold mb-0.5">Próximos mantenimientos</h3>
+              <p className="text-[#3D6A80] text-xs mb-5">Alertas en los próximos 7 días</p>
+              <div className="space-y-3">
+                {data?.alerts?.length === 0 ? (
+                  <div className="text-center py-6">
+                    <CheckCircle className="w-8 h-8 text-emerald-400/40 mx-auto mb-2" />
+                    <p className="text-[#2D4A63] text-xs">Sin alertas pendientes</p>
+                  </div>
+                ) : data?.alerts?.map((a: { id: string; asset_name: string; asset_serial: string; nextDate: string }) => (
+                  <div key={a.id} className="flex items-start gap-3 p-3 rounded-xl"
+                    style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)" }}>
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-white text-xs font-medium">{a.asset_name}</p>
+                      <p className="text-[#3D6A80] text-xs font-mono">{a.asset_serial}</p>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Clock className="w-3 h-3 text-amber-400/70" />
+                        <p className="text-amber-400/70 text-xs">
+                          {new Date(a.nextDate).toLocaleDateString("es-CO")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
-        )}
-
-      </div>
-    </div>
-  );
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function MaintenanceForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [assets, setAssets]   = useState<{ id: string; name: string; serial: string }[]>([]);
-  const [users, setUsers]     = useState<{ id: string; name: string; role: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [form, setForm] = useState({
-    assetId: "", techId: "", type: "PREVENTIVO", status: "PENDIENTE",
-    description: "", cost: "", date: "", nextDate: "",
-  });
-
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/assets").then(r => r.json()),
-      fetch("/api/users").then(r => r.json()),
-    ]).then(([a, u]) => {
-      setAssets(Array.isArray(a) ? a : []);
-      // Only show technicians and admins as assignable techs
-      setUsers(Array.isArray(u) ? u.filter((x) => x.role !== "CONSULTOR") : []);
-    });
-  }, []);
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    const res = await fetch("/api/maintenance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    setLoading(false);
-    if (res.ok) {
-      onSaved();
-    } else {
-      const err = await res.json();
-      setError(err.error || "Error al guardar");
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-[#162436] border border-[#243447] rounded-2xl w-full max-w-lg my-auto shadow-2xl">
-
-        <div className="flex items-center justify-between p-6 border-b border-[#243447]">
-          <div>
-            <h2 className="text-white font-semibold">Registrar Mantenimiento</h2>
-            <p className="text-[#8DA3B8] text-xs mt-0.5">Completa los datos del mantenimiento</p>
-          </div>
-          <button onClick={onClose} className="text-[#8DA3B8] hover:text-white transition-colors text-xl leading-none">✕</button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-
-          <div>
-            <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Activo *</label>
-            <select name="assetId" value={form.assetId} onChange={handleChange} required
-              className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]">
-              <option value="">Selecciona un activo</option>
-              {assets.map(a => (
-                <option key={a.id} value={a.id}>{a.name} — {a.serial}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Técnico asignado *</label>
-              <select name="techId" value={form.techId} onChange={handleChange} required
-                className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]">
-                <option value="">Selecciona técnico</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Tipo *</label>
-              <select name="type" value={form.type} onChange={handleChange}
-                className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]">
-                <option value="PREVENTIVO">Preventivo</option>
-                <option value="CORRECTIVO">Correctivo</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Estado inicial</label>
-            <select name="status" value={form.status} onChange={handleChange}
-              className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]">
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="EN_PROCESO">En proceso</option>
-              <option value="COMPLETADO">Completado</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Descripción *</label>
-            <textarea name="description" value={form.description} onChange={handleChange} required rows={3}
-              placeholder="Describe el mantenimiento a realizar o realizado..."
-              className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9] resize-none placeholder:text-[#4A5568]" />
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Fecha</label>
-              <input name="date" type="date" value={form.date} onChange={handleChange}
-                className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]" />
-            </div>
-            <div>
-              <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Próximo</label>
-              <input name="nextDate" type="date" value={form.nextDate} onChange={handleChange}
-                className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9]" />
-            </div>
-            <div>
-              <label className="block text-xs text-[#8DA3B8] mb-1.5 font-medium">Costo ($)</label>
-              <input name="cost" type="number" value={form.cost} onChange={handleChange}
-                placeholder="0"
-                className="w-full bg-[#0F1E2E] border border-[#243447] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#4A90D9] placeholder:text-[#4A5568]" />
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose}
-              className="flex-1 bg-[#243447] hover:bg-[#2E4158] text-white rounded-lg py-2 text-sm transition-colors">
-              Cancelar
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 bg-[#4A90D9] hover:bg-[#5AA0E9] text-white rounded-lg py-2 text-sm font-medium transition-colors disabled:opacity-60">
-              {loading ? "Guardando..." : "Registrar"}
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );
