@@ -55,8 +55,8 @@ export default function DashboardPage() {
     maintByType?: { type: string; count: number }[];
     topAssets?: { name: string; serial: string; total_mant: number }[];
     alerts?: { id: string; asset_name: string; asset_serial: string; nextDate: string }[];
-    activosPorMes?: { mes: string; count: string }[];
-    maintPorMes?: { mes: string; count: string; costo: string }[];
+    activosPorMes?: { mes: string; count: string | number }[];
+    maintPorMes?: { mes: string; count: string | number; costo: string | number }[];
     costos?: { total_period: string; total_month: string };
     maintThisMonth?: number;
     periodo?: { desde: string; hasta: string };
@@ -100,8 +100,8 @@ export default function DashboardPage() {
   const dadoBaja      = data?.byStatus?.["DADO_DE_BAJA"]      || 0;
   const totalConBaja  = operativos + enMant + fueraServicio + dadoBaja;
 
-  const preventivos = Number(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "PREVENTIVO")?.count ?? 0);
-  const correctivos = Number(data?.maintByType?.find((t: { type: string; count: string }) => t.type === "CORRECTIVO")?.count ?? 0);
+  const preventivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "PREVENTIVO")?.count ?? 0;
+  const correctivos = data?.maintByType?.find((t: { type: string; count: number }) => t.type === "CORRECTIVO")?.count ?? 0;
 
   const pieData = [
     { name: "Operativo",         value: operativos    },
@@ -110,14 +110,14 @@ export default function DashboardPage() {
     { name: "Dado de baja",      value: dadoBaja      },
   ].filter(d => d.value > 0);
 
-  const barData = data?.activosPorMes?.map((m: { mes: string; count: string }) => ({
-    mes: m.mes, Activos: parseInt(m.count),
+  const barData = data?.activosPorMes?.map((m: { mes: string; count: string | number }) => ({
+    mes: m.mes, Activos: Number(m.count),
   })) || [];
 
-  const lineData = data?.maintPorMes?.map((m: { mes: string; count: string; costo: string }) => ({
+  const lineData = data?.maintPorMes?.map((m: { mes: string; count: string | number; costo: string | number }) => ({
     mes: m.mes,
-    Mantenimientos: parseInt(m.count),
-    Costo: parseInt(m.costo),
+    Mantenimientos: Number(m.count),
+    Costo: Number(m.costo),
   })) || [];
 
   return (
