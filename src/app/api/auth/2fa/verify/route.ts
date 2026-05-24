@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { getToken, encode } from "next-auth/jwt";
-import { authOptions } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { authenticator } from "otplib";
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const currentToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET! });
+  if (!currentToken) return NextResponse.json({ error: "Token no encontrado" }, { status: 401 });
 
-  const userId = (session.user as { id: string }).id;
+  const userId = currentToken.id as string;
   const { code } = await req.json();
 
   if (!code || code.length !== 6) {
@@ -30,10 +28,6 @@ export async function POST(req: NextRequest) {
   if (!isValid) {
     return NextResponse.json({ error: "Código incorrecto" }, { status: 400 });
   }
-
-  // Actualizamos la cookie con twoFactorVerified = true
-  const currentToken = await getToken({ req, secret: process.env.NEXTAUTH_SECRET! });
-  if (!currentToken) return NextResponse.json({ error: "Token no encontrado" }, { status: 401 });
 
   const newTokenString = await encode({
     token: { ...currentToken, twoFactorVerified: true },
