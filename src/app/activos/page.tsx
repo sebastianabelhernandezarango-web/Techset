@@ -641,7 +641,7 @@ function MaintenanceForm({ assetId, assetName, onClose, onSaved }: {
   const userId  = (session?.user as { id?: string })?.id ?? "";
   const isAdmin = role === "ADMIN";
 
-  const [technicians, setTechnicians] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
   const [form, setForm] = useState({
@@ -797,7 +797,7 @@ function MaintenanceForm({ assetId, assetName, onClose, onSaved }: {
 
 // ── Formulario nuevo activo ───────────────────────────────────────────────────
 function AssetForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading]       = useState(false);
   const [form, setForm] = useState({
     name: "", serial: "", brand: "", model: "",
