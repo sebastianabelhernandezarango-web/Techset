@@ -275,8 +275,8 @@ export default function MantenimientosPage() {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MaintenanceForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [assets, setAssets]   = useState<Record<string, unknown>[]>([]);
-  const [users, setUsers]     = useState<Record<string, unknown>[]>([]);
+  const [assets, setAssets]   = useState<{ id: string; name: string; serial: string }[]>([]);
+  const [users, setUsers]     = useState<{ id: string; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [form, setForm] = useState({
