@@ -9,8 +9,8 @@ declare global {
 
 function createPrismaClient() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const adapter = new PrismaNeon(pool as ConstructorParameters<typeof PrismaNeon>[0]);
-  return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
+  const adapter = new PrismaNeon(pool as unknown as ConstructorParameters<typeof PrismaNeon>[0]);
+  return new PrismaClient({ adapter });
 }
 
 export const prisma = global.prisma || createPrismaClient();
