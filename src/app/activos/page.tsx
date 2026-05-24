@@ -132,6 +132,7 @@ export default function ActivosPage() {
     setDL(false);
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAssets(); }, [search, statusFilter]);
 
   const counts = {

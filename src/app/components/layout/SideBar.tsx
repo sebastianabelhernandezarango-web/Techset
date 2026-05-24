@@ -117,8 +117,8 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <p className="text-white text-xs font-medium truncate leading-none">{user?.name || "Usuario"}</p>
             <div className="flex items-center gap-1.5 mt-1">
-              <div className={`w-1.5 h-1.5 rounded-full ${ROLE_COLORS[user?.role] || "bg-slate-500"}`} />
-              <p className="text-[#3D6A80] text-[10px] leading-none">{ROLE_LABELS[user?.role] || user?.role}</p>
+              <div className={`w-1.5 h-1.5 rounded-full ${ROLE_COLORS[user?.role ?? ""] || "bg-slate-500"}`} />
+              <p className="text-[#3D6A80] text-[10px] leading-none">{ROLE_LABELS[user?.role ?? ""] || user?.role}</p>
             </div>
           </div>
         </div>
