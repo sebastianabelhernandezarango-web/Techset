@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,71 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+model Asset {
+  id                String              @id
+  name              String
+  serial            String              @unique
+  brand             String
+  model             String
+  purchaseDate      DateTime            @db.Timestamp(6)
+  warrantyDate      DateTime?           @db.Timestamp(6)
+  status            String              @default("OPERATIVO")
+  notes             String?
+  categoryId        String
+  createdAt         DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime            @default(now()) @db.Timestamp(6)
+  Category          Category            @relation(fields: [categoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Assignment        Assignment[]
+  MaintenanceRecord MaintenanceRecord[]
+}
+
+model Assignment {
+  id        String    @id
+  assetId   String
+  userId    String
+  area      String?
+  startDate DateTime  @default(now()) @db.Timestamp(6)
+  endDate   DateTime? @db.Timestamp(6)
+  notes     String?
+  Asset     Asset     @relation(fields: [assetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User      User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Category {
+  id    String  @id
+  name  String  @unique
+  icon  String  @default("box")
+  Asset Asset[]
+}
+
+model MaintenanceRecord {
+  id          String    @id
+  assetId     String
+  techId      String
+  type        String
+  description String
+  cost        Float?
+  date        DateTime  @default(now()) @db.Timestamp(6)
+  nextDate    DateTime? @db.Timestamp(6)
+  createdAt   DateTime  @default(now()) @db.Timestamp(6)
+  status      String    @default("PENDIENTE")
+  Asset       Asset     @relation(fields: [assetId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  User        User      @relation(fields: [techId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model User {
+  id                String              @id
+  name              String
+  email             String              @unique
+  passwordHash      String
+  role              String              @default("CONSULTOR")
+  active            Boolean             @default(true)
+  createdAt         DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime            @default(now()) @db.Timestamp(6)
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean             @default(false)
+  Assignment        Assignment[]
+  MaintenanceRecord MaintenanceRecord[]
 }
